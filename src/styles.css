@@ -1,0 +1,302 @@
+/* src/styles.css */
+@import "https://unpkg.com/open-props";
+@import "https://unpkg.com/open-props/normalize.min.css";
+
+/* 定义禅意变量 */
+:root {
+  --bg-color: #1a1a1a;
+  /* 深炭色 */
+  --text-color: var(--gray-2);
+  --accent-color: var(--green-4);
+  /* 抹茶绿 */
+  --font-main: var(--font-sans);
+
+  /* 使得窗口可拖拽 */
+  --app-region: drag;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: var(--font-main);
+  height: 100vh;
+  margin: 0;
+  overflow: hidden;
+  /* 禁止原生滚动，自己控制 */
+  display: grid;
+  place-items: center;
+
+  /* 噪点纹理，增加质感 */
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+/* 隐藏滚动条 */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* 自定义标题栏区域 (Tauri 特性) */
+.titlebar {
+  height: 30px;
+  background: transparent;
+  user-select: none;
+  display: flex;
+  justify-content: flex-end;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 999;
+}
+
+/* 核心容器 */
+#app {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  animation: var(--animation-fade-in) forwards;
+  /* Open Props 动画 */
+}
+
+/* 极简导航 */
+nav {
+  position: fixed;
+  top: 40px;
+  display: flex;
+  gap: var(--size-4);
+  z-index: 10;
+}
+
+nav button {
+  background: none;
+  border: none;
+  color: var(--gray-6);
+  font-size: var(--font-size-0);
+  letter-spacing: var(--font-letterspacing-3);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.3s var(--ease-3);
+}
+
+nav button.active {
+  color: var(--accent-color);
+  text-shadow: 0 0 10px var(--green-9);
+}
+
+/* 页面容器 */
+.view-container {
+  width: 100%;
+  height: 100%;
+  display: none;
+  /* 默认隐藏 */
+}
+
+.view-container.active {
+  display: flex;
+  /* 激活时显示 */
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  animation: var(--animation-slide-in-up) forwards;
+}
+
+/* Stream 输入框样式修复 */
+#stream-input {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--gray-3);
+  font-family: inherit;
+  font-size: var(--font-size-4);
+  line-height: 1.6;
+  resize: none;
+  padding: 2rem;
+
+  /* 关键修复: 防止长文本撑开容器 */
+  word-break: break-all;
+  white-space: pre-wrap;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* 画布清空按钮 - 禅意风格 */
+/* 画布工具栏 - 禅意风格 */
+.canvas-toolbar {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  gap: 12px;
+  z-index: 10;
+}
+
+.canvas-toolbar button,
+.canvas-toolbar input[type="color"] {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--gray-7);
+  background: rgba(30, 30, 30, 0.6);
+  color: var(--gray-5);
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.3s var(--ease-3);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+/* 颜色选择器特殊样式 */
+.canvas-toolbar input[type="color"] {
+  padding: 0;
+  overflow: hidden;
+}
+
+#release-btn:hover {
+  opacity: 0.8 !important;
+  transform: scale(1.1);
+  text-shadow: 0 0 10px #ff4500;
+}
+
+.canvas-toolbar input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 3px;
+}
+
+.canvas-toolbar input[type="color"]::-webkit-color-swatch {
+  border-radius: 50%;
+  border: none;
+}
+
+.canvas-toolbar button:hover,
+.canvas-toolbar input[type="color"]:hover {
+  border-color: var(--gray-5);
+  color: var(--gray-3);
+  transform: scale(1.1);
+  background: rgba(50, 50, 50, 0.8);
+}
+
+.canvas-toolbar button:active {
+  transform: scale(0.95);
+}
+
+/* 计时器样式 - 呼吸感 */
+.timer-circle {
+  width: var(--size-13);
+  height: var(--size-13);
+  border-radius: var(--radius-round);
+  border: 1px solid var(--gray-8);
+  display: grid;
+  place-items: center;
+  font-size: var(--font-size-8);
+  font-weight: var(--font-weight-1);
+  color: var(--gray-1);
+  position: relative;
+  transition: all 0.5s var(--ease-elastic-3);
+}
+
+.timer-circle.running {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 30px var(--green-9);
+}
+
+/* ========== 移动端适配 ========== */
+
+/* 安全区域适配 (刘海屏/药丸屏) */
+@supports (padding: env(safe-area-inset-top)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* 手机竖屏适配 (宽度 < 600px) */
+@media (max-width: 600px) {
+
+  /* 隐藏桌面标题栏 */
+  .titlebar {
+    display: none;
+  }
+
+  /* 导航栏调整 */
+  nav {
+    top: 20px;
+    gap: var(--size-3);
+  }
+
+  nav button {
+    font-size: var(--font-size-00);
+    padding: var(--size-2) var(--size-3);
+  }
+
+  /* 计时器圆圈缩小 */
+  .timer-circle {
+    width: var(--size-12);
+    height: var(--size-12);
+    font-size: var(--font-size-7);
+  }
+
+  /* Stream 文本区域 */
+  #stream-input {
+    width: 90% !important;
+    height: 60% !important;
+    font-size: var(--font-size-3) !important;
+  }
+
+  /* 提示文字 */
+  #timer p {
+    font-size: 10px;
+  }
+}
+
+/* 超小屏幕 (宽度 < 380px) */
+@media (max-width: 380px) {
+  nav {
+    gap: var(--size-2);
+  }
+
+  nav button {
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+
+  .timer-circle {
+    width: var(--size-11);
+    height: var(--size-11);
+    font-size: var(--font-size-6);
+  }
+}
+
+/* 横屏模式优化 */
+@media (max-height: 500px) and (orientation: landscape) {
+  nav {
+    top: 10px;
+  }
+
+  .timer-circle {
+    width: var(--size-10);
+    height: var(--size-10);
+    font-size: var(--font-size-5);
+  }
+}
+
+/* 触摸设备优化 */
+@media (hover: none) and (pointer: coarse) {
+  nav button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .timer-circle {
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
