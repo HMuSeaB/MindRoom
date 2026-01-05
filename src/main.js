@@ -133,12 +133,18 @@ document.addEventListener('DOMContentLoaded', () => {
         // 防止削顶失真 (Clipping)
         if (!this.compressor) {
           this.compressor = this.ctx.createDynamicsCompressor();
-          this.compressor.threshold.value = -24;
-          this.compressor.knee.value = 30;
-          this.compressor.ratio.value = 12;
-          this.compressor.attack.value = 0.003;
+          this.compressor.threshold.value = -10; // Relaxed threshold
+          this.compressor.knee.value = 40;
+          this.compressor.ratio.value = 8;
+          this.compressor.attack.value = 0.05; // Softer attack
           this.compressor.release.value = 0.25;
-          this.compressor.connect(this.ctx.destination);
+
+          if (!this.analyser) {
+            this.analyser = this.ctx.createAnalyser();
+            this.analyser.fftSize = 256;
+            this.compressor.connect(this.analyser);
+            this.analyser.connect(this.ctx.destination);
+          }
         }
 
         this.generateReverb();
@@ -165,6 +171,16 @@ document.addEventListener('DOMContentLoaded', () => {
       this.convolver = this.ctx.createConvolver();
       this.convolver.buffer = buffer;
       this.convolver.connect(this.compressor); // Connect to compressor
+    },
+
+    getAnalysis() {
+      if (!this.analyser) return { volume: 0 };
+      const len = this.analyser.frequencyBinCount;
+      const data = new Uint8Array(len);
+      this.analyser.getByteFrequencyData(data);
+      let sum = 0;
+      for (let i = 0; i < len; i++) sum += data[i];
+      return { volume: sum / len };
     },
 
     getBPM() {
@@ -195,61 +211,45 @@ document.addEventListener('DOMContentLoaded', () => {
       const gain = this.ctx.createGain();
       const filter = this.ctx.createBiquadFilter();
 
+      // Pure Chain: OSC -> FILTER -> GAIN -> COMPRESSOR
       osc.connect(filter);
       filter.connect(gain);
-
-      // 混响发送
-      const reverbGain = this.ctx.createGain();
-      gain.connect(reverbGain);
-      reverbGain.connect(this.convolver);
-      // 干音也输出一部分，连接到压缩器
       gain.connect(this.compressor);
 
       if (isFlowState) {
-        // --- 冰流音色 (High) ---
         osc.type = 'sine';
-        // 随机五声音阶 (Pentatonic scale)
-        const notes = [523.25, 587.33, 659.25, 783.99, 880.00]; // C5, D5, E5, G5, A5
-        const note = notes[Math.floor(Math.random() * notes.length)] * 1;
-
-        osc.frequency.setValueAtTime(note, t);
-        // 微小失谐，模拟自然感
-        osc.detune.value = Math.random() * 20 - 10;
-
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(2000, t);
-
-        // 短促信封 (Volume tuned down to prevent clipping)
-        gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(0.4, t + 0.01); // 0.6 -> 0.4
-        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
-
-        reverbGain.gain.value = 0.25;
-
-        osc.start(t);
-        osc.stop(t + 0.3);
-
-      } else {
-        // --- 深思音色 (Low) ---
-        osc.type = 'triangle';
-        const notes = [130.81, 146.83, 164.81, 196.00, 220.00]; // C3...
+        const notes = [523.25, 587.33, 659.25, 783.99, 880.00];
         const note = notes[Math.floor(Math.random() * notes.length)];
-
         osc.frequency.setValueAtTime(note, t);
 
         filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(400, t); // 很闷
+        filter.frequency.setValueAtTime(800, t); // Softer highs
 
-        // 缓慢信封 (Volume tuned down to prevent clipping)
         gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(0.3, t + 0.05); // 0.4 -> 0.3
-        gain.gain.exponentialRampToValueAtTime(0.01, t + 1.5);
-
-        reverbGain.gain.value = 0.6;
+        gain.gain.linearRampToValueAtTime(0.2, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2); // Tighter tail
 
         osc.start(t);
-        osc.stop(t + 2.0);
+        osc.stop(t + 0.4);
+      } else {
+        osc.type = 'sine';
+        const notes = [130.81, 146.83, 164.81, 196.00, 220.00];
+        const note = notes[Math.floor(Math.random() * notes.length)];
+        osc.frequency.setValueAtTime(note, t);
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(250, t);
+
+        // Long tail replaces reverb
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.15, t + 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+
+        osc.start(t);
+        osc.stop(t + 1.5);
       }
+
+      if (window.triggerRipple) window.triggerRipple(isFlowState);
     }
   };
 
@@ -426,7 +426,8 @@ document.addEventListener('DOMContentLoaded', () => {
     mode: 'CHAOS', // CHAOS | ORDER
     crystalEnergy: 0,
     shockwaves: [],
-    ashes: []
+    ashes: [],
+    ripples: []
   };
 
   function initEntropySystem() {
@@ -452,110 +453,143 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('resize', resize);
     resize();
 
-    class Particle {
-      constructor() {
-        this.reset();
-        // 初始随机分布
-        this.x = Math.random() * width;
-        this.y = Math.random() * height;
-      }
+    window.triggerRipple = (isFlow) => {
+      if (typeof entropyState === 'undefined') return;
 
-      reset() {
-        this.x = Math.random() > 0.5 ? 0 : width; // 从边缘重生
-        this.y = Math.random() * height;
-        if (Math.random() > 0.5) { this.x = Math.random() * width; this.y = Math.random() > 0.5 ? 0 : height; }
+      const centerX = width / 2;
+      const centerY = height / 2;
 
-        // 基础属性
-        this.vx = (Math.random() - 0.5) * 50; // pixels per second
-        this.vy = (Math.random() - 0.5) * 50;
-        this.size = Math.random() * 2 + 0.5;
-        this.baseAlpha = Math.random() * 0.4 + 0.1;
-        this.jitter = Math.random() * 20;
-      }
+      entropyState.shockwaves.push({
+        x: centerX,
+        y: centerY,
+        radius: 0,
+        speed: isFlow ? 1000 : 300,
+        thickness: isFlow ? 50 : 150,
+        decay: isFlow ? 0.8 : 0.2,
+        alpha: 1.0,
+        isFlow: isFlow
+      });
+    };
 
-      update(dt) {
-        // 1. 冲击波物理 (Wavefront)
-        entropyState.shockwaves.forEach(wave => {
-          const dx = this.x - wave.x;
-          const dy = this.y - wave.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
+    // Functional Particle System (Simpler, Robust)
+    function createParticle() {
+      const p = {
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 50,
+        vy: (Math.random() - 0.5) * 50,
+        size: Math.random() * 2 + 0.5,
+        baseAlpha: Math.random() * 0.4 + 0.1,
+        // Dynamic Props
+        drawScale: 1,
+        drawAlpha: 0.1 // Init value
+      };
+      p.drawAlpha = p.baseAlpha;
+      return p;
+    }
 
-          // 波前判定：是否处于波环内
-          const waveDist = Math.abs(dist - wave.radius);
-          if (waveDist < wave.thickness) {
-            const angle = Math.atan2(dy, dx);
-            const force = wave.strength * (1 - waveDist / wave.thickness);
-            this.x += Math.cos(angle) * force * dt * 60;
-            this.y += Math.sin(angle) * force * dt * 60;
-          }
-        });
+    function updateParticle(p, dt) {
+      // 1. Shockwaves
+      entropyState.shockwaves.forEach(wave => {
+        const dx = p.x - wave.x;
+        const dy = p.y - wave.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const waveDist = Math.abs(dist - wave.radius);
 
-        if (entropyState.mode === 'CHAOS') {
-          // 混乱模式：布朗运动 + 边界反弹
-          this.x += this.vx * dt;
-          this.y += this.vy * dt;
-
-          // 增加微小高频抖动 (Jitter)
-          this.x += (Math.random() - 0.5) * this.jitter * dt;
-          this.y += (Math.random() - 0.5) * this.jitter * dt;
-
-          if (this.x < 0 || this.x > width) this.vx *= -1;
-          if (this.y < 0 || this.y > height) this.vy *= -1;
-
-        } else if (entropyState.mode === 'ORDER') {
-          // 秩序模式：引力吸入
-          const centerX = width / 2;
-          const centerY = height / 2;
-          const dx = centerX - this.x;
-          const dy = centerY - this.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-
-          // 转为切向速度 (螺旋)
+        if (waveDist < wave.thickness) {
           const angle = Math.atan2(dy, dx);
-          const orbitSpeed = 100;
-          const suckSpeed = 80;
+          const force = wave.isFlow ? 200 : 50;
+          p.x += Math.cos(angle) * force * dt;
+          p.y += Math.sin(angle) * force * dt;
 
-          this.x += Math.cos(angle + 1.5) * orbitSpeed * dt; // 旋转
-          this.y += Math.sin(angle + 1.5) * orbitSpeed * dt;
-          this.x += Math.cos(angle) * suckSpeed * dt; // 吸入
-          this.y += Math.sin(angle) * suckSpeed * dt;
-
-          // 吞噬判定 (Absorption)
-          if (dist < 40) {
-            entropyState.crystalEnergy += 1;
-            this.reset(); // 粒子死亡并重置
-          }
+          const intensity = 1 - (waveDist / wave.thickness);
+          p.drawScale = 1 + intensity * (wave.isFlow ? 2 : 5);
+          p.drawAlpha = Math.min(1, p.baseAlpha + intensity);
         }
-      }
+      });
 
-      draw() {
-        ctx.fillStyle = `rgba(200, 200, 200, ${this.baseAlpha})`;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
+      // 2. Mode Logic
+      if (entropyState.mode === 'CHAOS') {
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        // Robust Bounce with Clamping
+        if (p.x < 0) { p.x = 0; p.vx = Math.abs(p.vx); }
+        else if (p.x > width) { p.x = width; p.vx = -Math.abs(p.vx); }
+
+        if (p.y < 0) { p.y = 0; p.vy = Math.abs(p.vy); }
+        else if (p.y > height) { p.y = height; p.vy = -Math.abs(p.vy); }
+
+        // Safety Respawn (If blown way off screen)
+        if (p.x < -200 || p.x > width + 200 || p.y < -200 || p.y > height + 200) {
+          Object.assign(p, createParticle());
+        }
+      } else {
+        // ORDER Mode
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const dx = centerX - p.x;
+        const dy = centerY - p.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx);
+
+        p.x += Math.cos(angle + 1.5) * 100 * dt;
+        p.y += Math.sin(angle + 1.5) * 100 * dt;
+        p.x += Math.cos(angle) * 80 * dt;
+        p.y += Math.sin(angle) * 80 * dt;
+
+        if (dist < 40) {
+          entropyState.crystalEnergy += 1;
+          // Reset Particle
+          Object.assign(p, createParticle());
+          // Keep edge logic? createParticle is random.
+          // Force edge spawn for variety
+          if (Math.random() > 0.5) p.x = (Math.random() > 0.5 ? 0 : width);
+        }
       }
     }
 
-    // 初始化粒子池
-    for (let i = 0; i < 150; i++) particles.push(new Particle());
+    function drawParticle(p) {
+      // Robust Draw
+      const alpha = (p.drawAlpha !== undefined) ? p.drawAlpha : p.baseAlpha;
+      const currentScale = p.drawScale || 1;
 
-    // 绘制晶体核心 (The Crystal)
+      ctx.fillStyle = `rgba(200, 200, 200, ${alpha})`;
+      ctx.beginPath();
+
+      const safeVolume = (Number.isFinite(entropyState.currentVolume) ? entropyState.currentVolume : 0);
+      const pulse = 1 + safeVolume * 0.5;
+      const r = Math.max(0.5, p.size * currentScale * pulse); // Min size 0.5
+
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Reset Frame Props
+      p.drawScale = 1;
+      p.drawAlpha = p.baseAlpha;
+    }
+
+    // Init Particles (Clear and Push)
+    particles = [];
+    for (let i = 0; i < 150; i++) particles.push(createParticle());
+
+    // Legacy code removed to fix crash
+
     function drawCrystal(dt) {
       if (entropyState.mode !== 'ORDER') return;
 
       const centerX = width / 2;
       const centerY = height / 2;
-      const size = 30 + entropyState.crystalEnergy * 0.5; // 随能量变大
+      const safeVolume = (Number.isFinite(entropyState.currentVolume) ? entropyState.currentVolume : 0);
+      const size = 30 + entropyState.crystalEnergy * 0.5 + safeVolume * 10;
 
       ctx.save();
       ctx.translate(centerX, centerY);
-      ctx.rotate(Date.now() * 0.001); // 缓慢旋转
+      ctx.rotate(Date.now() * 0.001);
 
-      // 能量脉冲闪烁
       if (entropyState.crystalEnergy > 0) {
         ctx.shadowBlur = entropyState.crystalEnergy * 2;
         ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
-        entropyState.crystalEnergy *= 0.95; // 能量衰减
+        entropyState.crystalEnergy *= 0.95;
       }
 
       ctx.strokeStyle = `rgba(255, 255, 255, 0.6)`;
@@ -568,7 +602,6 @@ document.addEventListener('DOMContentLoaded', () => {
       ctx.closePath();
       ctx.stroke();
 
-      // 内部几何
       ctx.beginPath();
       ctx.arc(0, 0, size * 0.4, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
@@ -578,48 +611,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function animate(timestamp) {
-      if (!lastTime) lastTime = timestamp;
-      const dt = (timestamp - lastTime) / 1000; // 秒为单位
-      lastTime = timestamp;
+      try {
+        if (!lastTime) lastTime = timestamp;
+        const dt = (timestamp - lastTime) / 1000;
+        lastTime = timestamp;
+        const safeDt = Math.min(dt, 0.1);
 
-      // 限制最小 dt 防止切屏后跳跃
-      const safeDt = Math.min(dt, 0.1);
+        ctx.clearRect(0, 0, width, height);
 
-      ctx.clearRect(0, 0, width, height);
+        const audioData = (typeSound && typeSound.getAnalysis) ? typeSound.getAnalysis() : { volume: 0 };
+        entropyState.currentVolume = audioData.volume / 255;
 
-      // 更新冲击波
-      entropyState.shockwaves = entropyState.shockwaves.filter(wave => {
-        wave.radius += wave.speed * safeDt;
-        wave.alpha -= wave.decay * safeDt;
-        return wave.alpha > 0;
-      });
+        // Ripples cleanup
+        entropyState.ripples = [];
 
-      // 更新 & 绘制 Ashes (Release Ritual)
-      entropyState.ashes = entropyState.ashes.filter(ash => {
-        ash.y -= ash.speed * safeDt; // 向上飘
-        ash.x += Math.sin(ash.y * 0.05 + ash.offset) * 20 * safeDt; // 左右摇摆
-        ash.alpha -= 0.5 * safeDt; // 渐隐
+        // Update Shockwaves
+        entropyState.shockwaves = entropyState.shockwaves.filter(wave => {
+          wave.radius += wave.speed * safeDt;
+          wave.alpha -= wave.decay * safeDt;
+          return wave.alpha > 0;
+        });
 
-        if (ash.alpha <= 0) return false;
+        // Update Ashes
+        entropyState.ashes = entropyState.ashes.filter(ash => {
+          ash.y -= ash.speed * safeDt;
+          ash.x += Math.sin(ash.y * 0.05 + ash.offset) * 20 * safeDt;
+          ash.alpha -= 0.5 * safeDt;
+          if (ash.alpha <= 0) return false;
+          ctx.fillStyle = `rgba(200, 200, 200, ${ash.alpha})`;
+          ctx.beginPath();
+          ctx.arc(ash.x, ash.y, ash.size, 0, Math.PI * 2);
+          ctx.fill();
+          return true;
+        });
 
-        ctx.fillStyle = `rgba(200, 200, 200, ${ash.alpha})`; // 灰烬色
-        ctx.beginPath();
-        ctx.arc(ash.x, ash.y, ash.size, 0, Math.PI * 2);
-        ctx.fill();
-        return true;
-      });
+        // Update Particles
+        particles.forEach(p => {
+          updateParticle(p, safeDt);
+          drawParticle(p);
+        });
 
-      // 绘制粒子
-      particles.forEach(p => {
-        p.update(safeDt);
-        p.draw();
-      });
-
-      // 绘制晶体
-      drawCrystal(safeDt);
+        // Draw Crystal
+        drawCrystal(safeDt);
+      } catch (err) {
+        console.error("Animate Error:", err);
+      }
 
       requestAnimationFrame(animate);
     }
+    console.log("EntropySystem Started. Particles:", particles.length);
     requestAnimationFrame(animate);
   }
 

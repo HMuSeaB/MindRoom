@@ -103,6 +103,16 @@ adb devices
 # 启用 USB 调试（手机设置 → 开发者选项 → USB 调试）
 ```
 
+### 错误: Creation symbolic link is not allowed
+此错误是因为 Windows 默认禁止非管理员创建符号链接。
+
+**解决方法 1 (推荐):**
+1. 打开 Windows 设置 -> **隐私和安全性** -> **开发者选项**
+2. 开启 **"开发人员模式"** (Developer Mode)
+
+**解决方法 2:**
+以 **管理员身份** 运行终端或 VS Code。
+
 ### 错误: Gradle build failed
 ```bash
 # 清理构建缓存
