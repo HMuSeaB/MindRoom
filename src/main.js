@@ -414,6 +414,46 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }, { passive: false });
 
+  // 触摸滑动调整时间 (Mobile Touch Support)
+  let touchStartY = null;
+
+  els.timerSection.addEventListener('touchstart', (e) => {
+    if (state.timerRunning) return;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  els.timerSection.addEventListener('touchmove', (e) => {
+    if (state.timerRunning || touchStartY === null) return;
+    e.preventDefault();
+
+    const touchY = e.touches[0].clientY;
+    const deltaY = touchStartY - touchY; // 向上滑为正值
+
+    // 每滑动 30px 调整 1 分钟
+    if (Math.abs(deltaY) >= 30) {
+      const change = Math.sign(deltaY) * 60; // 60秒 = 1分钟
+      let newTime = state.timeLeft + change;
+
+      // 限制范围：1分钟 - 120分钟
+      if (newTime < 60) newTime = 60;
+      if (newTime > 120 * 60) newTime = 120 * 60;
+
+      if (newTime !== state.timeLeft) {
+        state.timeLeft = newTime;
+        state.presetTime = newTime;
+        els.timerDisplay.textContent = formatTime(state.timeLeft);
+        saveTimerState();
+      }
+
+      // 重置起点，允许连续滑动
+      touchStartY = touchY;
+    }
+  }, { passive: false });
+
+  els.timerSection.addEventListener('touchend', () => {
+    touchStartY = null;
+  }, { passive: true });
+
   els.timerSection.addEventListener('click', toggleTimer);
 
   // 初始化时加载 Timer 状态

@@ -22,3 +22,23 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Tauri & Rust build artifacts
+src-tauri/target/
+src-tauri/gen/android/
+src-tauri/gen/schemas/
+
+# Android signing
+*.keystore
+*.jks
+key.properties
+
+# Rust lock file (library-style project)
+Cargo.lock
+
+# OS files
+Thumbs.db
+Desktop.ini
+
+# Misc
+npx
