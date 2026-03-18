@@ -4,6 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "check": "npm run check:frontend && npm run check:rust",
+    "check:frontend": "node scripts/check-frontend.mjs",
+    "check:rust": "cargo check --manifest-path src-tauri/Cargo.toml",
+    "dev": "tauri dev",
+    "build": "tauri build",
     "tauri": "tauri"
   },
   "devDependencies": {

@@ -20,24 +20,20 @@
 
     <section id="timer" class="view-container active">
       <div class="timer-circle" id="timer-display">25:00</div>
-      <p style="margin-top: 2rem; color: var(--gray-6); letter-spacing: 2px; font-size: 12px; opacity: 0.6;">CLICK TO
-        START • SCROLL TO SET</p>
+      <p class="timer-hint">CLICK TO START / SCROLL TO SET</p>
     </section>
 
-    <section id="stream" class="view-container" style="position: relative;">
-      <textarea id="stream-input" placeholder="Type into the void..."
-        style="width: 80%; height: 70%; background: transparent; border: none; color: var(--gray-3); font-size: var(--font-size-4); outline: none; resize: none;"></textarea>
-      <button id="release-btn" title="Release Thoughts"
-        style="position: absolute; bottom: 15%; right: 15%; background: transparent; border: none; font-size: 24px; cursor: pointer; opacity: 0.3; transition: opacity 0.5s;">🔥</button>
+    <section id="stream" class="view-container stream-view">
+      <textarea id="stream-input" placeholder="Type into the void..."></textarea>
+      <button id="release-btn" class="release-btn" title="Release Thoughts">Release</button>
     </section>
 
-    <section id="canvas" class="view-container" style="position: relative;">
-      <canvas id="mind-map"
-        style="position: absolute; top:0; left:0; width:100%; height:100%; cursor: crosshair;"></canvas>
+    <section id="canvas" class="view-container canvas-view">
+      <canvas id="mind-map"></canvas>
       <div class="canvas-toolbar">
-        <input type="color" id="node-color" value="#88ccaa" title="节点颜色">
-        <button id="export-canvas-btn" title="导出图片">⤓</button>
-        <button id="clear-canvas-btn" title="清空画布">○</button>
+        <input type="color" id="node-color" value="#88ccaa" title="Node Color">
+        <button id="export-canvas-btn" title="Export Canvas">Save</button>
+        <button id="clear-canvas-btn" title="Clear Canvas">Clear</button>
       </div>
     </section>
   </div>
