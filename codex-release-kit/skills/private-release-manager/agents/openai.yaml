@@ -1,0 +1,4 @@
+interface:
+  display_name: "Private Release Manager"
+  short_description: "Review, package, tag, and publish private app releases safely."
+  default_prompt: "Use $private-release-manager to review changes, run release checks, build artifacts, and publish a safe private release."
