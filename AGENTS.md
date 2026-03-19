@@ -51,6 +51,16 @@ npm run build
   `src-tauri/Cargo.toml`
   `src-tauri/tauri.conf.json`
 
+## Android CI Signing
+
+- GitHub Actions can build signed Android release artifacts when these repository secrets are set:
+  `ANDROID_KEY_BASE64`
+  `ANDROID_KEY_ALIAS`
+  `ANDROID_KEY_PASSWORD`
+  `ANDROID_KEYSTORE_PASSWORD`
+- Without those secrets, CI should keep producing debug Android artifacts instead of failing.
+- Do not commit `keystore.properties`, `.jks`, or `.keystore` files.
+
 ## Important Local Change Boundary
 
 - Treat `src-tauri/gen/android/**` deletions as a separate change set.

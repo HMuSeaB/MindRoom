@@ -111,18 +111,47 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Select Android build mode
+        shell: bash
+        run: |
+          if [[ -n "${{ secrets.ANDROID_KEY_BASE64 }}" && -n "${{ secrets.ANDROID_KEY_ALIAS }}" && -n "${{ secrets.ANDROID_KEY_PASSWORD }}" && -n "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ]]; then
+            echo "ANDROID_BUILD_MODE=release" >> "$GITHUB_ENV"
+            echo "ANDROID_ARTIFACT_NAME=mindroom-android-release-artifacts" >> "$GITHUB_ENV"
+          else
+            echo "ANDROID_BUILD_MODE=debug" >> "$GITHUB_ENV"
+            echo "ANDROID_ARTIFACT_NAME=mindroom-android-debug-artifacts" >> "$GITHUB_ENV"
+          fi
+
+      - name: Setup Android signing
+        if: env.ANDROID_BUILD_MODE == 'release'
+        shell: bash
+        run: |
+          cd src-tauri/gen/android
+          echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" > keystore.properties
+          echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> keystore.properties
+          echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> keystore.properties
+          base64 -d <<< "${{ secrets.ANDROID_KEY_BASE64 }}" > "$RUNNER_TEMP/mindroom-release.jks"
+          echo "storeFile=$RUNNER_TEMP/mindroom-release.jks" >> keystore.properties
+
       - name: Validate Rust workspace for Android targets
         run: cargo check --manifest-path src-tauri/Cargo.toml --target aarch64-linux-android
 
-      # Build a debug APK first so CI works without repository signing secrets.
-      - name: Build Tauri Android debug APK
-        run: npx tauri android build --debug
+      - name: Build Tauri Android artifacts
+        shell: bash
+        run: |
+          if [[ "$ANDROID_BUILD_MODE" == "release" ]]; then
+            npx tauri android build --release
+          else
+            npx tauri android build --debug
+          fi
 
       - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: mindroom-android-artifacts
+          name: ${{ env.ANDROID_ARTIFACT_NAME }}
           if-no-files-found: error
           path: |
             src-tauri/gen/android/app/build/outputs/apk/universal/debug/*.apk
+            src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
             src-tauri/gen/android/app/build/outputs/bundle/universalDebug/*.aab
+            src-tauri/gen/android/app/build/outputs/bundle/universalRelease/*.aab
