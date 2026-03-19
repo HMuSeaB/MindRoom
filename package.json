@@ -1,7 +1,7 @@
 {
   "name": "mindroom",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "scripts": {
     "check": "npm run check:frontend && npm run check:rust",
