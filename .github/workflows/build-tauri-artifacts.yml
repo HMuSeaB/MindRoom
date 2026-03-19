@@ -26,14 +26,11 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Run project checks
-        run: npm run check
+      - name: Run frontend checks
+        run: npm run check:frontend
 
   build-windows:
     name: Build Windows Installer
@@ -55,6 +52,9 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Validate Rust workspace
+        run: cargo check --manifest-path src-tauri/Cargo.toml
 
       - name: Build Tauri desktop bundles
         run: npm run build
@@ -110,6 +110,9 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Validate Rust workspace for Android targets
+        run: cargo check --manifest-path src-tauri/Cargo.toml --target aarch64-linux-android
 
       # Build a debug APK first so CI works without repository signing secrets.
       - name: Build Tauri Android debug APK
