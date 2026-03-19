@@ -118,9 +118,11 @@ jobs:
       - name: Build Tauri Android debug APK
         run: npx tauri android build --debug
 
-      - name: Upload Android APK
+      - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: mindroom-android-apk
+          name: mindroom-android-artifacts
           if-no-files-found: error
-          path: src-tauri/gen/android/app/build/outputs/apk/debug/*.apk
+          path: |
+            src-tauri/gen/android/app/build/outputs/apk/universal/debug/*.apk
+            src-tauri/gen/android/app/build/outputs/bundle/universalDebug/*.aab
